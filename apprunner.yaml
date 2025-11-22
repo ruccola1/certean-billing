@@ -1,0 +1,25 @@
+version: 1.0
+runtime: python3
+build:
+  commands:
+    build:
+      - echo "Installing dependencies..."
+      - pip install -r requirements.txt
+run:
+  runtime-version: 3.11
+  command: uvicorn backend.main:app --host 0.0.0.0 --port 8001
+  network:
+    port: 8001
+    env: PORT
+  env:
+    - name: MONGODB_URI
+      value: ""
+    - name: MONGODB_DB_NAME
+      value: "c_monitor_shared"
+    - name: STRIPE_SECRET_KEY
+      value: ""
+    - name: FRONTEND_URL
+      value: ""
+    - name: API_KEY
+      value: ""
+
