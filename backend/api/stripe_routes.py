@@ -14,10 +14,10 @@ from backend.config import settings
 router = APIRouter(prefix="/api/stripe", tags=["stripe"])
 
 # Initialize Stripe
-if not settings.stripe_secret_key:
-    raise ValueError("STRIPE_SECRET_KEY is required for billing service")
+if not settings.stripe_secret_key or settings.stripe_secret_key.strip() == "":
+    raise ValueError("STRIPE_SECRET_KEY is required for billing service. Please set it in environment variables.")
 stripe.api_key = settings.stripe_secret_key
-FRONTEND_URL = settings.frontend_url
+FRONTEND_URL = settings.frontend_url or "http://localhost:5173"
 
 class CreateCheckoutRequest(BaseModel):
     price_id: str
@@ -36,6 +36,13 @@ async def create_checkout_session(request: CreateCheckoutRequest):
     Create a Stripe Checkout session for subscription payment
     """
     try:
+        # Validate Stripe API key is set
+        if not stripe.api_key or stripe.api_key.strip() == "":
+            raise HTTPException(
+                status_code=500, 
+                detail="Stripe API key is not configured. Please set STRIPE_SECRET_KEY environment variable."
+            )
+        
         # Check if customer already exists
         customers = stripe.Customer.list(email=request.user_email, limit=1)
         
@@ -69,13 +76,21 @@ async def create_checkout_session(request: CreateCheckoutRequest):
             }
         )
         
+        if not session or not session.url:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create checkout session: Stripe returned invalid response"
+            )
+        
         return {
             "sessionId": session.id,
             "url": session.url
         }
     
+    except HTTPException:
+        raise
     except stripe.error.StripeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create checkout session: {str(e)}")
 
